@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CIDB Slip Downloader</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        .container {
+            width: 90%;
+            max-width: 600px;
+            margin: auto;
+            padding: 20px;
+            border: 1px solid #ccc;
+            box-shadow: 2px 2px 12px #aaa;
+            margin-top: 20px;
+            border-radius: 8px;
+        }
+        label {
+            display: block;
+            margin-top: 10px;
+        }
+        select, input, button {
+            width: 100%;
+            padding: 10px;
+            margin-top: 5px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+            border: 1px solid #ccc;
+        }
+        button {
+            background-color: #007bff;
+            color: #fff;
+            border: none;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .generated-btn {
+            display: none;
+        }
+        img {
+            display: none;
+            max-width: 100%;
+            margin-top: 20px;
+            border-radius: 4px;
+        }
+        .error-message {
+            display: none;
+            color: red;
+            font-size: 16px;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>CIDB Slip Downloader</h1>
+        <form id="urlForm">
+            <label for="country">Country:</label>
+            <select id="country" name="country" required>
+                <option value="BGL">Bangladesh</option>
+                <option value="CHN">China</option>
+                <option value="PAK">Pakistan</option>
+                <option value="IND">India</option>
+                <option value="">Malaysia</option>
+            </select>
+            <label for="passport">IC/ Passport:</label>
+            <input type="text" id="passport" name="passport" required>
+            <button type="submit">Generate URL</button>
+        </form>
+        <img id="personnelImage" src="" alt="Personnel Image" oncontextmenu="return false;">
+        <div id="errorMessage" class="error-message">
+            Kindly confirm the Country and IC/Passport key in is correct. Kindly verify this personnel was registered with 
+            <a href="https://cims.cidb.gov.my/pbsearch/Forms/Transactions/search.aspx?opt=N" target="_blank">CIDB</a>.
+        </div>
+        <button id="generatedBtn" class="generated-btn">Head to CIDB website to download the slip</button>
+    </div>
+    <script>
+        document.getElementById('passport').addEventListener('input', function(event) {
+            event.target.value = event.target.value.replace(/[^a-zA-Z0-9]/g, '');
+        });
+
+        document.getElementById('urlForm').addEventListener('submit', function(event) {
+            event.preventDefault();
+            const country = document.getElementById('country').value;
+            const passport = document.getElementById('passport').value.trim();
+
+            let url = "https://cims.cidb.gov.my/cpbv2/forms/transactions/slippass.aspx?collectionid=";
+            let imgUrl = "https://cims.cidb.gov.my/pbsearch/document/PersonnelImage/";
+
+            if (country === "") {
+                url += passport;
+                imgUrl += passport + ".jpg";
+            } else {
+                url += country + passport + "/1";
+                imgUrl += country + passport + "-1.jpg";
+            }
+
+            const generatedBtn = document.getElementById('generatedBtn');
+            generatedBtn.style.display = 'block';
+            generatedBtn.innerHTML = 'Head to CIDB website to download the slip';
+            generatedBtn.onclick = function() {
+                window.open(url, '_blank');
+            };
+
+            const personnelImage = document.getElementById('personnelImage');
+            const errorMessage = document.getElementById('errorMessage');
+
+            personnelImage.onload = function() {
+                personnelImage.style.display = 'block';
+                errorMessage.style.display = 'none';
+                generatedBtn.style.display = 'block';
+            };
+
+            personnelImage.onerror = function() {
+                personnelImage.style.display = 'none';
+                errorMessage.style.display = 'block';
+                generatedBtn.style.display = 'none';
+            };
+
+            personnelImage.src = imgUrl;
+        });
+    </script>
+</body>
+</html>
