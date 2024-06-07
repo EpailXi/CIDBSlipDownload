@@ -74,7 +74,7 @@
             </select>
             <label for="passport">IC/ Passport:</label>
             <input type="text" id="passport" name="passport" maxlength="12" required>
-            <button type="submit">Generate</button>
+            <button type="submit">Generate URL</button>
         </form>
         <img id="personnelImage" src="" alt="Personnel Image" oncontextmenu="return false;">
         <div id="errorMessage" class="error-message">
@@ -84,8 +84,32 @@
         <button id="generatedBtn" class="generated-btn">Head to CIDB website to download the slip</button>
     </div>
     <script>
+        document.getElementById('country').addEventListener('change', function(event) {
+            const passportInput = document.getElementById('passport');
+            if (event.target.value === "") {  // Malaysia selected
+                passportInput.value = passportInput.value.replace(/[^0-9]/g, '');
+                passportInput.setAttribute('maxlength', '12');
+            } else {
+                passportInput.setAttribute('maxlength', '20');
+            }
+        });
+
         document.getElementById('passport').addEventListener('input', function(event) {
-            event.target.value = event.target.value.replace(/[^a-zA-Z0-9]/g, '');
+            const country = document.getElementById('country').value;
+            if (country === "") {  // Malaysia selected
+                event.target.value = event.target.value.replace(/[^0-9]/g, '');
+            } else {
+                event.target.value = event.target.value.replace(/[^a-zA-Z0-9]/g, '');
+            }
+
+            const input = event.target.value;
+
+            if ((country === "" && input.length >= 12 && /^[0-9]+$/.test(input)) || 
+                (country !== "" && input.length >= 9 && /^[a-zA-Z0-9]+$/.test(input))) {
+                event.target.setCustomValidity('');
+            } else {
+                event.target.setCustomValidity('Please enter the correct number of characters.');
+            }
         });
 
         document.getElementById('urlForm').addEventListener('submit', function(event) {
