@@ -239,8 +239,8 @@
       <div class="field" id="relayWrap" style="margin-top:18px;padding-top:16px;border-top:1px solid var(--rule)">
         <label for="relay">CIMS relay URL — advanced (optional)</label>
         <input type="text" id="relay" autocomplete="off" spellcheck="false"
-               placeholder="https://your-worker.workers.dev">
-        <div class="hint" id="relayHint">If this site is deployed with the CIMS relay function, names &amp; expiry auto-fill — nothing to paste. Otherwise paste a relay URL here, or type names by hand.</div>
+               placeholder="Leave blank — a relay is already built in">
+        <div class="hint" id="relayHint">Names, expiry &amp; validity auto-fill from CIMS by default. Only set this to point at your own relay instead.</div>
       </div>
     </section>
 
@@ -348,14 +348,18 @@ const RKEY = 'cidb.relay';
 let relayUrl = '';
 try { relayUrl = localStorage.getItem(RKEY) || ''; } catch {}
 function relayHas(){ return /^https?:\/\//i.test(relayUrl.trim()); }
+// Built-in relay (Cloudflare Worker) so names auto-fill with nothing to set up.
+const DEFAULT_RELAY = 'https://weathered-salad-3ac9.asiangxi.workers.dev';
 // Candidate relay endpoints in priority order:
-//  1) a function co-hosted on THIS origin (…/api/cims) — nothing to paste,
-//     works automatically when the site is deployed on a functions host
-//     (Cloudflare Pages / Vercel / Netlify);
-//  2) a relay URL pasted into the box (e.g. a standalone Cloudflare Worker).
+//  1) the built-in worker above;
+//  2) a function co-hosted on THIS origin (…/api/cims), if the site is later
+//     deployed on a functions host (Cloudflare Pages / Vercel / Netlify);
+//  3) a relay URL pasted into the box, which overrides the default.
 function relayEndpoints(){
-  const list = [ new URL('api/cims', location.href).href ];
-  if (relayHas()) list.push(relayUrl.trim());
+  const list = [];
+  if (relayHas()) list.push(relayUrl.trim());   // user override wins
+  if (DEFAULT_RELAY) list.push(DEFAULT_RELAY);
+  list.push(new URL('api/cims', location.href).href);
   return list;
 }
 function relayLink(base, c, id){
