@@ -79,7 +79,11 @@
     width:100%;background:transparent;border:1px solid var(--rule);border-radius:8px;
     padding:10px 12px;font-family:var(--mono);font-size:14px;
   }
-  input[type=text]:focus,textarea:focus{border-color:var(--focus);outline:none;box-shadow:0 0 0 3px var(--green-soft)}
+  select#country{
+    width:100%;background:var(--card);border:1px solid var(--rule);border-radius:8px;
+    padding:10px 12px;font-family:var(--mono);font-size:14px;color:var(--ink);cursor:pointer;
+  }
+  input[type=text]:focus,textarea:focus,select#country:focus{border-color:var(--focus);outline:none;box-shadow:0 0 0 3px var(--green-soft)}
   textarea{min-height:132px;resize:vertical;line-height:1.7}
   .hint{font-size:12px;color:var(--concrete);margin-top:6px}
   .hint.warn{color:var(--amber)}
@@ -206,8 +210,7 @@
 
       <div class="field">
         <label for="country">Nationality</label>
-        <input type="text" id="country" list="countryList" placeholder="Start typing…" autocomplete="off" spellcheck="false">
-        <datalist id="countryList"></datalist>
+        <select id="country"></select>
         <div class="hint" id="countryHint">Malaysia takes a numeric IC with no prefix.</div>
       </div>
 
@@ -234,10 +237,10 @@
       </div>
 
       <div class="field" id="relayWrap" style="margin-top:18px;padding-top:16px;border-top:1px solid var(--rule)">
-        <label for="relay">CIMS relay URL — auto-fill names (optional)</label>
+        <label for="relay">CIMS relay URL — advanced (optional)</label>
         <input type="text" id="relay" autocomplete="off" spellcheck="false"
                placeholder="https://your-worker.workers.dev">
-        <div class="hint" id="relayHint">Paste your relay URL to pull names &amp; expiry straight from CIMS. Leave blank to type names by hand.</div>
+        <div class="hint" id="relayHint">If this site is deployed with the CIMS relay function, names &amp; expiry auto-fill — nothing to paste. Otherwise paste a relay URL here, or type names by hand.</div>
       </div>
     </section>
 
@@ -293,7 +296,7 @@ CIDB_CODES.split('|').forEach(p => {
 });
 
 const el = {};
-['country','countryList','countryHint','single','icHint','bulk','oneWrap','manyWrap',
+['country','countryHint','single','icHint','bulk','oneWrap','manyWrap',
  'tabOne','tabMany','run','copyAll','exportCsv','retryAll','clearAll','rows','empty',
  'tally','recent','recentWrap','toast','codeCount','relay','relayHint'].forEach(k => el[k] = document.getElementById(k));
 
@@ -302,8 +305,9 @@ el.codeCount.textContent = names.size + ' codes on file';
 const label = c => names.get(c) + ' (' + c + ')';
 const rest  = [...names.keys()].filter(c => !COMMON.includes(c))
                 .sort((a, b) => names.get(a).localeCompare(names.get(b)));
-el.countryList.innerHTML = [...COMMON.filter(c => names.has(c)), ...rest]
-  .map(c => `<option value="${label(c)}">`).join('');
+// Populate the nationality dropdown: common nationalities first, then the rest A–Z.
+el.country.innerHTML = [...COMMON.filter(c => names.has(c)), ...rest]
+  .map(c => `<option value="${c}">${names.get(c)} (${c})</option>`).join('');
 
 /* ---- helpers ---- */
 const codeOf = text => {
@@ -344,20 +348,33 @@ const RKEY = 'cidb.relay';
 let relayUrl = '';
 try { relayUrl = localStorage.getItem(RKEY) || ''; } catch {}
 function relayHas(){ return /^https?:\/\//i.test(relayUrl.trim()); }
-function relayLink(c, id){
-  const base = relayUrl.trim();
+// Candidate relay endpoints in priority order:
+//  1) a function co-hosted on THIS origin (…/api/cims) — nothing to paste,
+//     works automatically when the site is deployed on a functions host
+//     (Cloudflare Pages / Vercel / Netlify);
+//  2) a relay URL pasted into the box (e.g. a standalone Cloudflare Worker).
+function relayEndpoints(){
+  const list = [ new URL('api/cims', location.href).href ];
+  if (relayHas()) list.push(relayUrl.trim());
+  return list;
+}
+function relayLink(base, c, id){
   const q = 'sval=' + encodeURIComponent(id) + (isLocal(c) ? '' : '&ct=' + encodeURIComponent(c));
   return base + (base.includes('?') ? '&' : '?') + q;
 }
 async function relayFetch(c, id){
-  const ctl = new AbortController();
-  const t = setTimeout(() => ctl.abort(), 15000);
-  try {
-    const r = await fetch(relayLink(c, id), { signal: ctl.signal });
-    clearTimeout(t);
-    if (!r.ok) return null;
-    return await r.json();
-  } catch { clearTimeout(t); return null; }
+  for (const base of relayEndpoints()){
+    const ctl = new AbortController();
+    const t = setTimeout(() => ctl.abort(), 15000);
+    try {
+      const r = await fetch(relayLink(base, c, id), { signal: ctl.signal });
+      clearTimeout(t);
+      if (!r.ok) continue;
+      const d = await r.json();
+      if (d && (d.found || 'name' in d)) return d;
+    } catch { clearTimeout(t); }
+  }
+  return null;
 }
 
 const cleanId = (c, v) => isLocal(c) ? v.replace(/\D/g, '').slice(0, 12)
@@ -407,6 +424,7 @@ function syncSingle(){
                   : names.get(c) + ' → ' + c + ' prefix, /1 suffix.')
     : 'Malaysia takes a numeric IC with no prefix.';
 }
+el.country.addEventListener('change', syncSingle);
 el.country.addEventListener('input', syncSingle);
 el.single.addEventListener('input', syncSingle);
 el.single.addEventListener('keydown', e => { if (e.key === 'Enter') run(); });
@@ -503,7 +521,6 @@ function setValidLine(r){
   }
 }
 function applyRelay(r){
-  if (!relayHas()) return;
   relayFetch(r.code, r.id).then(d => {
     r.relayDone = true;
     if (!d){ setValidLine(r); return; }
@@ -638,7 +655,7 @@ function run(){
   results = batch.concat(results);
   render();
   batch.forEach(enqueue);
-  if (relayHas()) batch.forEach(applyRelay);
+  batch.forEach(applyRelay);
   remember(batch);
 }
 el.run.onclick = run;
@@ -705,7 +722,7 @@ el.recent.addEventListener('click', e => {
   const i = e.target.dataset.recent;
   if (i === undefined) return;
   const r = recent[i];
-  el.country.value = label(r.code);
+  el.country.value = r.code;
   setMode('one');
   el.single.value = r.id;
   syncSingle();
@@ -714,7 +731,7 @@ el.recent.addEventListener('click', e => {
 
 /* ---- boot ---- */
 const qs = new URLSearchParams(location.search);
-el.country.value = label(codeOf(qs.get('c')) || LOCAL);
+el.country.value = codeOf(qs.get('c')) || LOCAL;
 if (qs.get('id')) el.single.value = qs.get('id');
 syncSingle();
 drawRecent();
